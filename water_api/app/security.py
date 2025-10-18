@@ -5,7 +5,7 @@ import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import PyJWTError
-from passlib.hash import argon2
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -17,6 +17,9 @@ ACCESS_EXPIRES_SECONDS = int(os.getenv("ACCESS_EXPIRES_SECONDS", "900"))
 REFRESH_EXPIRES_SECONDS = int(os.getenv("REFRESH_EXPIRES_SECONDS", "604800"))
 
 security_scheme = HTTPBearer(auto_error=False)
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["argon2"])
 
 
 def make_jwt(sub: str, expires_seconds: int, **claims) -> str:
@@ -31,11 +34,11 @@ def make_jwt(sub: str, expires_seconds: int, **claims) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return argon2.verify(plain, hashed)
+    return pwd_context.verify(plain, hashed)
 
 
 def hash_password(plain: str) -> str:
-    return argon2.hash(plain)
+    return pwd_context.hash(plain)
 
 
 def parse_jwt(token: str) -> dict:
