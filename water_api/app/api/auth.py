@@ -1,21 +1,24 @@
-
-from pydantic import BaseModel, EmailStr
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
+
 from app.db import get_db
 from app.models import User
-from app.security import hash_password, verify_password, make_jwt, ACCESS_EXPIRES_SECONDS, REFRESH_EXPIRES_SECONDS
+from app.security import ACCESS_EXPIRES_SECONDS, REFRESH_EXPIRES_SECONDS, make_jwt, verify_password
 
 router = APIRouter()
+
 
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
 
+
 class TokensOut(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
 
 @router.post("/login", response_model=TokensOut)
 def login(data: LoginIn, db: Session = Depends(get_db)):
