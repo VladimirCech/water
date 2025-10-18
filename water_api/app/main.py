@@ -15,7 +15,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(games.router, prefix="/games", tags=["games"])
-app.include_router(drm.router, prefix="/", tags=["launch"])
+app.include_router(drm.router, tags=["launch"])
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 
 
