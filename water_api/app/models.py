@@ -29,7 +29,7 @@ class Build(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), index=True)
     version: Mapped[str] = mapped_column(String(50))
-    file_path: Mapped[str] = mapped_column(String(500))
+    s3_key: Mapped[str] = mapped_column(String(500))
     sha256: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

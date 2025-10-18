@@ -26,7 +26,9 @@ class DownloadUrlOut(BaseModel):
 
 @router.get("/", response_model=list[GameOut])
 def list_games(user=Depends(current_user), db: Session = Depends(get_db)):
-    games = db.query(Game).join(Entitlement, Entitlement.game_id == Game.id).filter(Entitlement.user_id == user.id).all()
+    games = (
+        db.query(Game).join(Entitlement, Entitlement.game_id == Game.id).filter(Entitlement.user_id == user.id).all()
+    )
     return games
 
 

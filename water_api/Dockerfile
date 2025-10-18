@@ -20,6 +20,8 @@ COPY pyproject.toml poetry.lock* /app/
 RUN poetry install --no-interaction --no-ansi --no-root
 
 COPY app /app/app
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
 
 EXPOSE 8080
 CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
