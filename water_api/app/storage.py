@@ -2,6 +2,7 @@ import os
 
 import boto3
 from botocore.client import Config
+from botocore.exceptions import ClientError
 from mypy_boto3_s3.client import S3Client
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
@@ -28,8 +29,12 @@ def ensure_bucket_exists() -> None:
     s3 = get_s3_client()
     try:
         s3.head_bucket(Bucket=MINIO_BUCKET)
-    except s3.exceptions.NoSuchBucket:
-        s3.create_bucket(Bucket=MINIO_BUCKET)
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "")
+        if error_code in ("404", "NoSuchBucket"):
+            s3.create_bucket(Bucket=MINIO_BUCKET)
+        else:
+            raise
 
 
 def upload_game_build(file_path: str, game_slug: str, version: str) -> str:
