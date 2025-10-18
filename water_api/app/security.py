@@ -2,7 +2,8 @@
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import jwt, JWTError
+import jwt
+from jwt.exceptions import PyJWTError
 from passlib.hash import argon2
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -31,7 +32,7 @@ def hash_password(plain: str) -> str:
 def parse_jwt(token: str) -> dict:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
-    except JWTError as e:
+    except PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme), db: Session = Depends(get_db)):
