@@ -5,14 +5,14 @@ SHELL := /bin/bash
 build-dev:
 	cd compose && docker compose build api
 
-run-dev:
-	cd compose && docker compose up api db
+run-api-dev:
+	cd compose && docker compose up api db minio -d
 
-stop-dev:
+stop-api-dev:
 	cd compose && docker compose down
 
-restart-dev:
+restart-api-dev:
 	cd compose && docker compose restart api
 
-logs-dev:
+logs-api-dev:
 	cd compose && docker compose logs -f api

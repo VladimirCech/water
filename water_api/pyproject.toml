@@ -13,12 +13,13 @@ uvicorn = {version="^0.30.0", extras=["standard"]}
 sqlalchemy = "^2.0.36"
 alembic = "^1.13.2"
 psycopg2-binary = "^2.9.9"
-pydantic = "^2.8.2"
+pydantic = {version="^2.8.2", extras=["email"]}
 pydantic-settings = "^2.0.0"
 pyjwt = {version="^2.8.0", extras=["crypto"]}
 passlib = {version="^1.7.4", extras=["argon2"]}
 python-dotenv = "^1.0.1"
 httpx = "^0.27.2"
+boto3 = "^1.35.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
