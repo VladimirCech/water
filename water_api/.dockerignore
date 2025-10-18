@@ -1,0 +1,14 @@
+# backend/.dockerignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.build/
+dist/
+.eggs/
+.venv/
+.pytest_cache/
+.cache/
+.mypy_cache/
+.idea/
+.vscode/

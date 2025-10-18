@@ -1,0 +1,20 @@
+
+[tool.poetry]
+name = "water-game-skeleton"
+version = "0.1.0"
+description = "water Pygame skeleton with DRM-lite SDK"
+authors = ["You <you@example.com>"]
+packages = [{ include = "demo_game" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pygame = "^2.6.1"
+httpx = "^0.27.2"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.8.0"
+ruff = "^0.6.9"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
