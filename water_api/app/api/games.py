@@ -44,5 +44,5 @@ def get_build_download(build_id: int, user=Depends(current_user), db: Session = 
         raise HTTPException(status_code=403, detail="No entitlement for this game")
 
     # Generate presigned URL
-    download_url = get_download_url(build.file_path, expires_in=3600)
+    download_url = get_download_url(build.s3_key, expires_in=3600)
     return DownloadUrlOut(url=download_url)
