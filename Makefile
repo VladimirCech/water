@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
-.PHONY: build-dev run-dev stop-dev restart-dev logs-dev
+.PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev \
+        lint fmt type-check check test
 
 build-dev:
 	cd compose && docker compose build api
@@ -16,3 +17,19 @@ restart-api-dev:
 
 logs-api-dev:
 	cd compose && docker compose logs -f api
+
+# Code quality targets
+lint:
+	cd water_api && poetry run ruff check app/
+
+fmt:
+	cd water_api && poetry run black app/ && poetry run ruff check --fix app/
+
+type-check:
+	cd water_api && poetry run mypy app/
+
+check: lint type-check
+	@echo "✅ All checks passed!"
+
+test:
+	cd water_api && poetry run pytest
