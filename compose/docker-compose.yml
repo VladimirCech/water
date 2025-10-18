@@ -1,16 +1,21 @@
 version: "3.9"
 services:
   db:
-    image: postgres:16
+    image: postgres:17
     restart: unless-stopped
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: app
+      POSTGRES_USER: water-app
+      POSTGRES_PASSWORD: waterpass
+      POSTGRES_DB: waterdb
     ports:
       - "5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
     build:
@@ -21,10 +26,10 @@ services:
     depends_on:
       - db
     ports:
-      - "8000:8000"
+      - "8080:8080"
     volumes:
       - ../water_api/app:/app/app
-    command: poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: poetry run uvicorn app.main:app --host 0.0.0.0 --port 8080
 
 volumes:
   dbdata:
