@@ -23,7 +23,7 @@ lint:
 	cd water_api && poetry run ruff check app/
 
 fmt:
-	cd water_api && poetry run black app/ && poetry run ruff check --fix app/
+	cd water_api && poetry run ruff format app/ && poetry run ruff check --fix app/
 
 type-check:
 	cd water_api && poetry run mypy app/

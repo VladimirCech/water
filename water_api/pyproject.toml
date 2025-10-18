@@ -22,22 +22,19 @@ httpx = "^0.27.2"
 boto3 = "^1.35.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.8.0"
 ruff = "^0.6.9"
 mypy = "^1.8.0"
 pytest = "^8.0.0"
 pytest-asyncio = "^0.23.0"
 # Type stubs for third-party libraries
 types-passlib = "^1.7.7"
-
-[tool.black]
-line-length = 120
-target-version = ['py311']
-include = '\.pyi?$'
+boto3-stubs = {version="^1.35.0", extras=["s3"]}
 
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -48,12 +45,18 @@ select = [
     "UP",  # pyupgrade
 ]
 ignore = [
-    "E501",  # line too long (handled by black)
+    "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # unused imports in __init__.py
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.11"
