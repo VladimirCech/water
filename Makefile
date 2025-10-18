@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev \
         lint fmt type-check check test
 
-build-dev:
+build-api-dev:
 	cd compose && docker compose build api
 
 run-api-dev:
