@@ -1,5 +1,6 @@
 import os
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 from fastapi import Depends, HTTPException
@@ -22,7 +23,7 @@ security_scheme = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["argon2"])
 
 
-def make_jwt(sub: str, expires_seconds: int, **claims) -> str:
+def make_jwt(sub: str, expires_seconds: int, **claims: Any) -> str:
     now = datetime.now(UTC)
     payload = {
         "sub": sub,
