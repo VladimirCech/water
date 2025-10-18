@@ -1,16 +1,18 @@
-
 SHELL := /bin/bash
 
-.PHONY: compose-up compose-down compose-logs \
-        water-api-setup water-api-env water-api-seed water-api-run \
-        client-setup client-run \
-        game-setup game-run \
-        build-dev run-dev \
-        fmt
+.PHONY: build-dev run-dev stop-dev restart-dev logs-dev
 
 build-dev:
-	docker build -t water-dev -f water_api/Dockerfile water_api
+	cd compose && docker compose build api
 
 run-dev:
-	docker run -v $(pwd)/water_api:/app -p 8000:8000 water-dev \
-	  uvicorn app.main:app --host 0.0.0.0 --port 8000
+	cd compose && docker compose up api db
+
+stop-dev:
+	cd compose && docker compose down
+
+restart-dev:
+	cd compose && docker compose restart api
+
+logs-dev:
+	cd compose && docker compose logs -f api
