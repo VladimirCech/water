@@ -55,8 +55,17 @@ class Launcher(QWidget):
     def play_selected(self):
         item = self.list_games.selectedItems()[0]
         game_id = int(item.text().split(" – ")[0])
-        build_id = 1  # demo build from seed
         try:
+            # Fetch builds for the selected game
+            builds_resp = httpx.get(f"{API_BASE}/games/{game_id}/builds", headers={"Authorization": f"Bearer {self.access}"}, timeout=10.0)
+            builds_resp.raise_for_status()
+            builds = builds_resp.json()
+            if not builds:
+                QMessageBox.critical(self, "Launch failed", "No builds available for this game.")
+                return
+            # Select the latest build (by highest id)
+            latest_build = max(builds, key=lambda b: b.get("id", 0))
+            build_id = latest_build["id"]
             r = httpx.post(f"{API_BASE}/launch/{build_id}", headers={"Authorization": f"Bearer {self.access}"}, timeout=10.0)
             r.raise_for_status()
             token = r.json()["token"]
