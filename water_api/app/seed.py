@@ -1,4 +1,5 @@
 import hashlib
+import os
 import tempfile
 
 from sqlalchemy import select
@@ -55,8 +56,6 @@ def main():
                 s.flush()
                 print(f"✅ Created build v1.0 and uploaded to MinIO: {s3_key}")
             finally:
-                import os
-
                 os.unlink(tmp_path)
         else:
             print("ℹ️  Build already exists: v1.0")
