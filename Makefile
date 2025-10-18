@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev \
+.PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev seed-dev \
         lint fmt type-check check test
 
 build-api-dev:
@@ -17,6 +17,9 @@ restart-api-dev:
 
 logs-api-dev:
 	cd compose && docker compose logs -f api
+
+seed-dev:
+	cd compose && docker compose exec api poetry run python -m app.seed
 
 # Code quality targets
 lint:
