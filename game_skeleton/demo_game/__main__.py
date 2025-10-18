@@ -40,7 +40,6 @@ def run_game(token: str, access_token: str | None = None):
         screen.fill((20, 24, 28))
         msg = "water Demo — online session active" if session_id else "water Demo — offline"
         text = font.render(msg, True, (240, 240, 240))
-        pygame.display.flip()
         screen.blit(text, (40, 160))
         pygame.display.flip()
         pygame.time.delay(50)
