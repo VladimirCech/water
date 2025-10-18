@@ -9,7 +9,7 @@ DC := cd $(COMPOSE_DIR) && docker compose
 DC_EXEC := $(DC) exec -w /app api
 DC_RUN := poetry run
 
-.PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev seed-dev \
+.PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev db-reset seed-dev \
         migrate-create migrate-up migrate-down migrate-history migrate-current migrate-stamp \
         lint fmt type-check check test
 
@@ -28,6 +28,20 @@ restart-api-dev:
 
 logs-api-dev:
 	$(DC) logs -f api
+
+db-reset:
+	@echo "⚠️  This will DELETE all data in the database!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		($(DC) down -v) && \
+		($(DC) up db minio -d) && \
+		sleep 3 && \
+		($(DC) up api -d) && \
+		sleep 2 && \
+		($(DC_EXEC) $(DC_RUN) alembic upgrade head) && \
+		echo "✅ Database reset complete. Run 'make seed-dev' to add demo data."; \
+	fi
 
 # Database operations
 seed-dev:
