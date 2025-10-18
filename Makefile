@@ -9,7 +9,7 @@ SHELL := /bin/bash
         fmt
 
 build-dev:
-	docker build -t water-dev -f water_api/Dockerfile .
+	docker build -t water-dev -f water_api/Dockerfile water_api
 
 run-dev:
 	docker run -v $(pwd)/water_api:/app -p 8000:8000 water-dev \
