@@ -8,7 +8,9 @@ A PySide6-based game launcher that handles:
 - Game downloads and launching
 """
 
+import subprocess
 import sys
+from pathlib import Path
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -26,12 +28,52 @@ from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
     QTabWidget,
+    QProgressDialog,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 import httpx
 
-from .config import API_BASE
+from .config import API_BASE, GAMES_DIR
+from .download import DownloadManager, DownloadError
+
+
+class DownloadThread(QThread):
+    """Background thread for downloading games."""
+
+    progress = Signal(int, int)  # downloaded, total
+    finished = Signal(Path)  # game_path
+    error = Signal(str)  # error message
+
+    def __init__(
+        self,
+        download_manager: DownloadManager,
+        url: str,
+        game_slug: str,
+        version: str,
+        expected_sha256: Optional[str] = None,
+    ):
+        super().__init__()
+        self.dm = download_manager
+        self.url = url
+        self.game_slug = game_slug
+        self.version = version
+        self.expected_sha256 = expected_sha256
+
+    def run(self):
+        try:
+            game_path = self.dm.download(
+                self.url,
+                self.game_slug,
+                self.version,
+                self.expected_sha256,
+                progress_callback=lambda d, t: self.progress.emit(d, t),
+            )
+            self.finished.emit(game_path)
+        except DownloadError as e:
+            self.error.emit(str(e))
+        except Exception as e:
+            self.error.emit(f"Unexpected error: {e}")
 
 
 class ApiClient:
@@ -237,19 +279,33 @@ class LoginDialog(QDialog):
 class GameListItem(QListWidgetItem):
     """Custom list item for games."""
 
-    def __init__(self, game: dict):
+    def __init__(self, game: dict, installed: bool = False, in_library: bool = True):
         self.game = game
+        self.installed = installed
         owned = game.get("owned", True)  # Library items are always owned
         price = game.get("price", "0.00")
 
-        if owned:
-            text = f"✓ {game['name']}"
+        if in_library:
+            # Library view - show installed status
+            if installed:
+                text = f"✅ {game['name']} [Installed]"
+            else:
+                text = f"⬇️ {game['name']} [Not installed]"
         else:
-            text = f"{game['name']} - ${price}"
+            # Store view - show owned/price
+            if owned:
+                text = f"✓ {game['name']} [Owned]"
+            else:
+                text = f"{game['name']} - ${price}"
 
         super().__init__(text)
 
-        if owned:
+        if in_library:
+            if installed:
+                self.setForeground(Qt.darkGreen)
+            else:
+                self.setForeground(Qt.darkGray)
+        elif owned:
             self.setForeground(Qt.darkGreen)
 
 
@@ -259,6 +315,7 @@ class MainWindow(QMainWindow):
     def __init__(self, api: ApiClient):
         super().__init__()
         self.api = api
+        self.download_manager = DownloadManager()
         self.setWindowTitle("Water Launcher")
         self.setMinimumSize(600, 450)
 
@@ -301,6 +358,12 @@ class MainWindow(QMainWindow):
         self.play_btn.clicked.connect(self._play_game)
         self.play_btn.setEnabled(False)
         btn_layout.addWidget(self.play_btn)
+        
+        self.uninstall_btn = QPushButton("🗑 Uninstall")
+        self.uninstall_btn.clicked.connect(self._uninstall_game)
+        self.uninstall_btn.setEnabled(False)
+        btn_layout.addWidget(self.uninstall_btn)
+        
         self.refresh_btn = QPushButton("🔄 Refresh")
         self.refresh_btn.clicked.connect(self._load_library)
         btn_layout.addWidget(self.refresh_btn)
@@ -367,7 +430,10 @@ class MainWindow(QMainWindow):
             games = self.api.get_library()
             self.library_list.clear()
             for game in games:
-                self.library_list.addItem(GameListItem(game))
+                # Check if any version is installed
+                installed_versions = self.download_manager.get_installed_versions(game["slug"])
+                is_installed = len(installed_versions) > 0
+                self.library_list.addItem(GameListItem(game, installed=is_installed, in_library=True))
             self.statusBar().showMessage(f"Loaded {len(games)} games")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load library: {e}")
@@ -377,13 +443,25 @@ class MainWindow(QMainWindow):
             games = self.api.get_store()
             self.store_list.clear()
             for game in games:
-                self.store_list.addItem(GameListItem(game))
+                self.store_list.addItem(GameListItem(game, installed=False, in_library=False))
             self.statusBar().showMessage(f"Loaded {len(games)} games from store")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load store: {e}")
 
     def _library_selection_changed(self):
-        self.play_btn.setEnabled(len(self.library_list.selectedItems()) == 1)
+        items = self.library_list.selectedItems()
+        has_selection = len(items) == 1
+        self.play_btn.setEnabled(has_selection)
+        
+        # Enable uninstall only if game is installed
+        if has_selection:
+            item = items[0]
+            if isinstance(item, GameListItem):
+                self.uninstall_btn.setEnabled(item.installed)
+            else:
+                self.uninstall_btn.setEnabled(False)
+        else:
+            self.uninstall_btn.setEnabled(False)
 
     def _store_selection_changed(self):
         items = self.store_list.selectedItems()
@@ -408,6 +486,7 @@ class MainWindow(QMainWindow):
 
         game = item.game
         game_id = game["id"]
+        game_slug = game["slug"]
 
         try:
             # Get builds
@@ -419,26 +498,240 @@ class MainWindow(QMainWindow):
             # Get latest build
             latest_build = max(builds, key=lambda b: b["id"])
             build_id = latest_build["id"]
+            version = latest_build["version"]
+            expected_sha256 = latest_build.get("sha256")
 
-            # Get launch token
-            launch_token = self.api.get_launch_token(build_id)
+            # Check if already installed
+            if self.download_manager.is_installed(game_slug, version):
+                self._launch_game(game, latest_build)
+                return
 
-            # Show success - in real app would launch the game
-            QMessageBox.information(
+            # Need to download first
+            reply = QMessageBox.question(
                 self,
-                "Launch Ready",
-                f"Game: {game['name']}\n"
-                f"Build: v{latest_build['version']}\n"
-                f"Launch token obtained!\n\n"
-                f"In a full implementation, the game would now start with DRM validation.",
+                "Download Required",
+                f"'{game['name']}' v{version} needs to be downloaded.\n\nDownload now?",
+                QMessageBox.Yes | QMessageBox.No,
             )
 
-            self.statusBar().showMessage(f"Launched {game['name']} v{latest_build['version']}")
+            if reply != QMessageBox.Yes:
+                return
+
+            # Get download URL
+            download_url = self.api.get_download_url(build_id)
+
+            # Start download with progress dialog
+            self._start_download(game, latest_build, download_url, expected_sha256)
+
+        except httpx.HTTPStatusError as e:
+            QMessageBox.critical(self, "Error", f"API Error: {e.response.text}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
+    def _start_download(self, game: dict, build: dict, url: str, expected_sha256: Optional[str]):
+        """Start downloading a game with progress dialog."""
+        game_slug = game["slug"]
+        version = build["version"]
+
+        # Create progress dialog
+        self.progress_dialog = QProgressDialog(
+            f"Downloading {game['name']} v{version}...",
+            "Cancel",
+            0,
+            100,
+            self,
+        )
+        self.progress_dialog.setWindowTitle("Downloading")
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setAutoClose(False)
+        self.progress_dialog.setAutoReset(False)
+
+        # Create download thread
+        self.download_thread = DownloadThread(
+            self.download_manager,
+            url,
+            game_slug,
+            version,
+            expected_sha256,
+        )
+
+        # Store game info for launch after download
+        self._pending_game = game
+        self._pending_build = build
+
+        # Connect signals
+        self.download_thread.progress.connect(self._on_download_progress)
+        self.download_thread.finished.connect(self._on_download_finished)
+        self.download_thread.error.connect(self._on_download_error)
+        self.progress_dialog.canceled.connect(self._on_download_canceled)
+
+        # Start download
+        self.download_thread.start()
+        self.progress_dialog.show()
+
+    def _on_download_progress(self, downloaded: int, total: int):
+        """Update progress dialog."""
+        if total > 0:
+            percent = int(downloaded * 100 / total)
+            self.progress_dialog.setValue(percent)
+            mb_downloaded = downloaded / (1024 * 1024)
+            mb_total = total / (1024 * 1024)
+            self.progress_dialog.setLabelText(
+                f"Downloading... {mb_downloaded:.1f} / {mb_total:.1f} MB"
+            )
+
+    def _on_download_finished(self, game_path: Path):
+        """Handle successful download."""
+        self.progress_dialog.close()
+        self.statusBar().showMessage(f"Downloaded to {game_path}")
+
+        # Launch the game
+        if hasattr(self, "_pending_game") and hasattr(self, "_pending_build"):
+            self._launch_game(self._pending_game, self._pending_build)
+            del self._pending_game
+            del self._pending_build
+
+    def _on_download_error(self, error_msg: str):
+        """Handle download error."""
+        self.progress_dialog.close()
+        QMessageBox.critical(self, "Download Failed", error_msg)
+
+    def _on_download_canceled(self):
+        """Handle download cancellation."""
+        if hasattr(self, "download_thread") and self.download_thread.isRunning():
+            self.download_thread.terminate()
+            self.download_thread.wait()
+        self.statusBar().showMessage("Download cancelled")
+
+    def _launch_game(self, game: dict, build: dict):
+        """Launch an installed game with DRM."""
+        import zipfile
+        import logging
+        import platform
+        
+        logger = logging.getLogger("water.launcher")
+        
+        game_slug = game["slug"]
+        version = build["version"]
+        build_id = build["id"]
+
+        try:
+            # Get launch token
+            launch_token = self.api.get_launch_token(build_id)
+            access_token = self.api.access_token
+
+            # Get game path
+            game_path = self.download_manager.get_game_path(game_slug, version)
+            zip_path = game_path / "game.zip"
+            extracted_path = game_path / "extracted"
+            
+            # Extract if not already extracted
+            if not extracted_path.exists():
+                self.statusBar().showMessage(f"Extracting {game['name']}...")
+                QApplication.processEvents()
+                
+                extracted_path.mkdir(parents=True, exist_ok=True)
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    zf.extractall(extracted_path)
+                
+                self.statusBar().showMessage(f"Extracted {game['name']}")
+            
+            logger.info(f"Looking for game executable in {extracted_path}")
+            
+            # DRM arguments to pass to the game
+            drm_args = ["--token", launch_token, "--access", access_token, "--api", API_BASE]
+            
+            # Strategy 1: Look for native executable (Unity, Godot, compiled games)
+            executable = self._find_native_executable(extracted_path, platform.system())
+            if executable:
+                logger.info(f"Found native executable: {executable}")
+                cmd = [str(executable)] + drm_args
+                cwd = executable.parent
+            else:
+                # Strategy 2: Look for Python package with __main__.py
+                game_module = self._find_python_module(extracted_path)
+                if game_module:
+                    logger.info(f"Found Python module: {game_module}")
+                    cmd = [sys.executable, "-m", game_module] + drm_args
+                    cwd = extracted_path
+                else:
+                    QMessageBox.critical(
+                        self,
+                        "Launch Failed",
+                        f"Could not find game executable in {extracted_path}\n\n"
+                        "Expected one of:\n"
+                        "- Native executable (.app, .exe, or Linux binary)\n"
+                        "- Python package with __main__.py",
+                    )
+                    return
+            
+            logger.info(f"Launching game with command: {' '.join(cmd)}")
+            logger.info(f"Working directory: {cwd}")
+            
+            self.statusBar().showMessage(f"Launching {game['name']}...")
+            
+            # Run the game in a separate process
+            process = subprocess.Popen(cmd, cwd=str(cwd))
+            
+            self.statusBar().showMessage(f"Launched {game['name']} v{version} (PID: {process.pid})")
+            logger.info(f"Game process started with PID: {process.pid}")
 
         except httpx.HTTPStatusError as e:
             QMessageBox.critical(self, "Launch Failed", f"Error: {e.response.text}")
         except Exception as e:
+            logger.exception("Failed to launch game")
             QMessageBox.critical(self, "Launch Failed", str(e))
+
+    def _find_native_executable(self, path: Path, system: str) -> Optional[Path]:
+        """Find native game executable based on platform."""
+        # macOS: Look for .app bundles
+        if system == "Darwin":
+            for item in path.rglob("*.app"):
+                if item.is_dir():
+                    # Return path to the actual binary inside .app
+                    binary = item / "Contents" / "MacOS"
+                    if binary.exists():
+                        for exe in binary.iterdir():
+                            if exe.is_file():
+                                return exe
+            # Also check for direct binaries (non-.app)
+            for item in path.iterdir():
+                if item.is_file() and not item.suffix and item.stat().st_mode & 0o111:
+                    return item
+        
+        # Windows: Look for .exe files
+        elif system == "Windows":
+            for item in path.rglob("*.exe"):
+                if item.is_file():
+                    return item
+        
+        # Linux: Look for executable files without extension
+        else:
+            for item in path.iterdir():
+                if item.is_file() and not item.suffix:
+                    # Check if executable
+                    if item.stat().st_mode & 0o111:
+                        return item
+            # Also check common patterns
+            for pattern in ["*.x86_64", "*.x86", "*Linux*"]:
+                for item in path.rglob(pattern):
+                    if item.is_file():
+                        return item
+        
+        return None
+
+    def _find_python_module(self, path: Path) -> Optional[str]:
+        """Find Python module with __main__.py."""
+        for item in path.iterdir():
+            if item.is_dir():
+                # Check for Python package (with __main__.py)
+                if (item / "__main__.py").exists():
+                    return item.name
+                # Check for subdirectory with __main__.py
+                for subitem in item.iterdir():
+                    if subitem.is_dir() and (subitem / "__main__.py").exists():
+                        return subitem.name
+        return None
 
     def _purchase_game(self):
         items = self.store_list.selectedItems()
@@ -483,6 +776,49 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Purchase Failed", f"Error: {detail}")
         except Exception as e:
             QMessageBox.critical(self, "Purchase Failed", str(e))
+
+    def _uninstall_game(self):
+        """Uninstall the selected game from local storage."""
+        items = self.library_list.selectedItems()
+        if not items:
+            return
+
+        item = items[0]
+        if not isinstance(item, GameListItem):
+            return
+
+        game = item.game
+        game_slug = game["slug"]
+
+        # Confirm uninstall
+        reply = QMessageBox.question(
+            self,
+            "Confirm Uninstall",
+            f"Uninstall '{game['name']}'?\n\n"
+            f"This will delete all downloaded files for this game.",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            # Delete all versions of this game
+            if self.download_manager.delete_game(game_slug):
+                QMessageBox.information(
+                    self,
+                    "Uninstalled",
+                    f"'{game['name']}' has been uninstalled.",
+                )
+                self._load_library()  # Refresh to update installed status
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Not Installed",
+                    f"'{game['name']}' is not installed.",
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Uninstall Failed", str(e))
 
 
 def main():

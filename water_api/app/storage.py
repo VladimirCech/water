@@ -6,6 +6,7 @@ from botocore.exceptions import ClientError
 from mypy_boto3_s3.client import S3Client
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
+MINIO_PUBLIC_ENDPOINT = os.getenv("MINIO_PUBLIC_ENDPOINT", "localhost:9000")  # For client downloads
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "water-games")
@@ -62,9 +63,17 @@ def upload_build_fileobj(file_obj, game_slug: str, version: str) -> str:
 
 
 def get_download_url(object_key: str, expires_in: int = 3600) -> str:
-    """Generate presigned download URL"""
-    s3 = get_s3_client()
-    return s3.generate_presigned_url(
+    """Generate presigned download URL using public endpoint for client access"""
+    # Create a separate client with public endpoint for presigned URLs
+    public_client = boto3.client(
+        "s3",
+        endpoint_url=f"http{'s' if MINIO_SECURE else ''}://{MINIO_PUBLIC_ENDPOINT}",
+        aws_access_key_id=MINIO_ACCESS_KEY,
+        aws_secret_access_key=MINIO_SECRET_KEY,
+        config=Config(signature_version="s3v4"),
+        region_name="us-east-1",
+    )
+    return public_client.generate_presigned_url(
         "get_object",
         Params={"Bucket": MINIO_BUCKET, "Key": object_key},
         ExpiresIn=expires_in,

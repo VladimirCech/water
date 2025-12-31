@@ -25,6 +25,34 @@ ERROR_COLOR = (234, 67, 53)
 SUCCESS_COLOR = (52, 168, 83)
 
 
+class Button:
+    """Simple clickable button."""
+    
+    def __init__(self, x: int, y: int, width: int, height: int, text: str, font):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.font = font
+        self.hovered = False
+        
+    def draw(self, screen):
+        color = (80, 80, 90) if self.hovered else (60, 64, 68)
+        pygame.draw.rect(screen, color, self.rect, border_radius=5)
+        pygame.draw.rect(screen, (100, 100, 110), self.rect, 2, border_radius=5)
+        
+        text_surface = self.font.render(self.text, True, (240, 240, 240))
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        screen.blit(text_surface, text_rect)
+        
+    def handle_event(self, event) -> bool:
+        """Returns True if button was clicked."""
+        if event.type == pygame.MOUSEMOTION:
+            self.hovered = self.rect.collidepoint(event.pos)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1 and self.rect.collidepoint(event.pos):
+                return True
+        return False
+
+
 class DemoGame:
     """Simple demo game showcasing Water DRM integration."""
     
@@ -47,6 +75,11 @@ class DemoGame:
         self.player_x = WINDOW_WIDTH // 2
         self.player_y = WINDOW_HEIGHT // 2
         self.player_speed = 5
+        
+        # Exit button
+        self.exit_button = Button(
+            WINDOW_WIDTH - 120, 20, 100, 40, "Exit", self.font_medium
+        )
     
     def handle_events(self) -> None:
         """Process pygame events."""
@@ -56,6 +89,9 @@ class DemoGame:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
+            # Check exit button
+            if self.exit_button.handle_event(event):
+                self.running = False
     
     def update(self) -> None:
         """Update game state."""
@@ -110,6 +146,9 @@ class DemoGame:
         # Draw player (simple circle)
         pygame.draw.circle(self.screen, ACCENT_COLOR, (self.player_x, self.player_y), 25)
         pygame.draw.circle(self.screen, TEXT_COLOR, (self.player_x, self.player_y), 25, 2)
+        
+        # Draw exit button
+        self.exit_button.draw(self.screen)
         
         pygame.display.flip()
     
