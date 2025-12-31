@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, drm, games, sessions
+from app.api import auth, drm, games, sessions, shop
 
 app = FastAPI(title="water API", version="0.1.0")
 
@@ -15,6 +15,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(games.router, prefix="/games", tags=["games"])
+app.include_router(shop.router, prefix="/shop", tags=["shop"])
 app.include_router(drm.router, tags=["launch"])
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 

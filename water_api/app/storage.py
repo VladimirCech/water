@@ -38,7 +38,7 @@ def ensure_bucket_exists() -> None:
 
 
 def upload_game_build(file_path: str, game_slug: str, version: str) -> str:
-    """Upload game build to MinIO and return object key"""
+    """Upload game build to MinIO from file path and return object key"""
     s3 = get_s3_client()
     ensure_bucket_exists()
 
@@ -46,6 +46,17 @@ def upload_game_build(file_path: str, game_slug: str, version: str) -> str:
 
     with open(file_path, "rb") as f:
         s3.upload_fileobj(f, MINIO_BUCKET, object_key)
+
+    return object_key
+
+
+def upload_build_fileobj(file_obj, game_slug: str, version: str) -> str:
+    """Upload game build to MinIO from file-like object and return object key"""
+    s3 = get_s3_client()
+    ensure_bucket_exists()
+
+    object_key = f"games/{game_slug}/{version}/game.zip"
+    s3.upload_fileobj(file_obj, MINIO_BUCKET, object_key)
 
     return object_key
 

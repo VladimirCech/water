@@ -1,22 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+import hashlib
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Build, Entitlement, Game
-from app.security import current_user
-from app.storage import get_download_url
+from app.models import Build, Entitlement, Game, User
+from app.security import current_user, require_admin
+from app.storage import get_download_url, upload_build_fileobj
 
 router = APIRouter()
 
 
 class GameOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     slug: str
+    price: Decimal
 
-    class Config:
-        from_attributes = True
+
+class GameCreate(BaseModel):
+    name: str
+    slug: str
+    description: str = ""
+    price: Decimal = Decimal("0.00")
 
 
 class DownloadUrlOut(BaseModel):
@@ -47,3 +57,79 @@ def get_build_download(build_id: int, user=Depends(current_user), db: Session = 
     # Generate presigned URL
     download_url = get_download_url(build.s3_key, expires_in=3600)
     return DownloadUrlOut(url=download_url)
+
+
+# ============ Admin Endpoints ============
+
+
+@router.post("/", response_model=GameOut, status_code=201)
+def create_game(data: GameCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Create a new game (admin only)."""
+    # Check if slug already exists
+    existing = db.query(Game).filter(Game.slug == data.slug).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Game with this slug already exists")
+
+    game = Game(
+        name=data.name,
+        slug=data.slug,
+        description=data.description,
+        price=data.price,
+    )
+    db.add(game)
+    db.commit()
+    db.refresh(game)
+    return game
+
+
+class BuildOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    game_id: int
+    version: str
+    s3_key: str
+    sha256: str
+
+
+@router.post("/{game_id}/builds", response_model=BuildOut, status_code=201)
+def upload_build(
+    game_id: int,
+    version: str,
+    file: UploadFile,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Upload a new build for a game (admin only)."""
+    # Verify game exists
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Check if version already exists
+    existing = db.query(Build).filter(Build.game_id == game_id, Build.version == version).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Build version {version} already exists for this game")
+
+    # Read file content and compute SHA256
+    content = file.file.read()
+    sha256_hash = hashlib.sha256(content).hexdigest()
+
+    # Reset file position for upload
+    file.file.seek(0)
+
+    # Upload to MinIO
+    s3_key = upload_build_fileobj(file.file, game.slug, version)
+
+    # Create build record
+    build = Build(
+        game_id=game_id,
+        version=version,
+        s3_key=s3_key,
+        sha256=sha256_hash,
+    )
+    db.add(build)
+    db.commit()
+    db.refresh(build)
+
+    return build

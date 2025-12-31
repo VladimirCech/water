@@ -1,11 +1,12 @@
 import os
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import PyJWTError
-from passlib.hash import argon2
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -18,8 +19,11 @@ REFRESH_EXPIRES_SECONDS = int(os.getenv("REFRESH_EXPIRES_SECONDS", "604800"))
 
 security_scheme = HTTPBearer(auto_error=False)
 
+# Password hashing context
+pwd_context = CryptContext(schemes=["argon2"])
 
-def make_jwt(sub: str, expires_seconds: int, **claims) -> str:
+
+def make_jwt(sub: str, expires_seconds: int, **claims: Any) -> str:
     now = datetime.now(UTC)
     payload = {
         "sub": sub,
@@ -31,11 +35,11 @@ def make_jwt(sub: str, expires_seconds: int, **claims) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return argon2.verify(plain, hashed)
+    return pwd_context.verify(plain, hashed)
 
 
 def hash_password(plain: str) -> str:
-    return argon2.hash(plain)
+    return pwd_context.hash(plain)
 
 
 def parse_jwt(token: str) -> dict:
@@ -45,7 +49,11 @@ def parse_jwt(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token") from e
 
 
-def current_user(creds: HTTPAuthorizationCredentials | None = Depends(security_scheme), db: Session = Depends(get_db)):
+def current_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    """Dependency that returns the current authenticated user."""
     if creds is None:
         raise HTTPException(status_code=401, detail="Missing credentials")
     data = parse_jwt(creds.credentials)
@@ -53,4 +61,11 @@ def current_user(creds: HTTPAuthorizationCredentials | None = Depends(security_s
     user = db.get(User, uid)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+def require_admin(user: User = Depends(current_user)) -> User:
+    """Dependency that requires the current user to be an admin."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
     return user
