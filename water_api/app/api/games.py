@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -14,6 +16,7 @@ class GameOut(BaseModel):
     id: int
     name: str
     slug: str
+    price: Decimal
 
     class Config:
         from_attributes = True

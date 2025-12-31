@@ -1,6 +1,7 @@
 import hashlib
 import os
 import tempfile
+from decimal import Decimal
 
 from sqlalchemy import select
 
@@ -20,20 +21,29 @@ def main():
         # Create demo user
         u = s.execute(select(User).where(User.email == "test@example.com")).scalar_one_or_none()
         if not u:
-            u = User(email="test@example.com", password_hash=hash_password("test"))
+            u = User(
+                username="testuser",
+                email="test@example.com",
+                password_hash=hash_password("Test1234"),
+            )
             s.add(u)
             s.flush()
-            print("✅ Created user: test@example.com")
+            print("✅ Created user: testuser (test@example.com)")
         else:
             print("ℹ️  User already exists: test@example.com")
 
         # Create demo game
         g = s.execute(select(Game).where(Game.slug == "space-ducks")).scalar_one_or_none()
         if not g:
-            g = Game(name="Space Ducks", slug="space-ducks", description="Quack in space!")
+            g = Game(
+                name="Space Ducks",
+                slug="space-ducks",
+                description="Quack in space! An epic adventure of ducks exploring the galaxy.",
+                price=Decimal("9.99"),
+            )
             s.add(g)
             s.flush()
-            print("✅ Created game: Space Ducks")
+            print("✅ Created game: Space Ducks ($9.99)")
         else:
             print("ℹ️  Game already exists: Space Ducks")
 
@@ -71,8 +81,8 @@ def main():
             print("ℹ️  Entitlement already exists")
 
     print("\n🎉 Seed complete!")
-    print("   User: test@example.com / test")
-    print("   Game: Space Ducks (slug: space-ducks)")
+    print("   User: testuser / Test1234 (email: test@example.com)")
+    print("   Game: Space Ducks ($9.99, slug: space-ducks)")
     print("   Build: v1.0 available for download")
 
 

@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
@@ -16,8 +18,20 @@ router = APIRouter()
 
 
 class RegisterNewUser(BaseModel):
+    username: str
     email: EmailStr
     password: str
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters")
+        if len(v) > 50:
+            raise ValueError("Username must be at most 50 characters")
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+            raise ValueError("Username can only contain letters, numbers, underscores and hyphens")
+        return v
 
     @field_validator("password")
     @classmethod
@@ -34,7 +48,7 @@ class RegisterNewUser(BaseModel):
 
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 
@@ -47,11 +61,19 @@ class TokensOut(BaseModel):
 @router.post("/register", response_model=TokensOut, status_code=201)
 def register(data: RegisterNewUser, db: Session = Depends(get_db)):
     """Register a new user account."""
-    existing = db.query(User).filter(User.email == data.email).first()
-    if existing:
+    existing_email = db.query(User).filter(User.email == data.email).first()
+    if existing_email:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    user = User(email=data.email, password_hash=hash_password(data.password))
+    existing_username = db.query(User).filter(User.username == data.username).first()
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    user = User(
+        username=data.username,
+        email=data.email,
+        password_hash=hash_password(data.password),
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -63,7 +85,8 @@ def register(data: RegisterNewUser, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokensOut)
 def login(data: LoginIn, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
+    """Login with username and password."""
+    user = db.query(User).filter(User.username == data.username).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     access = make_jwt(str(user.id), ACCESS_EXPIRES_SECONDS)
