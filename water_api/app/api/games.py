@@ -1,13 +1,14 @@
+import hashlib
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Build, Entitlement, Game, User
 from app.security import current_user, require_admin
-from app.storage import get_download_url
+from app.storage import get_download_url, upload_build_fileobj
 
 router = APIRouter()
 
@@ -80,3 +81,57 @@ def create_game(data: GameCreate, admin: User = Depends(require_admin), db: Sess
     db.commit()
     db.refresh(game)
     return game
+
+
+class BuildOut(BaseModel):
+    id: int
+    game_id: int
+    version: str
+    s3_key: str
+    sha256: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.post("/{game_id}/builds", response_model=BuildOut, status_code=201)
+def upload_build(
+    game_id: int,
+    version: str,
+    file: UploadFile,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Upload a new build for a game (admin only)."""
+    # Verify game exists
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Check if version already exists
+    existing = db.query(Build).filter(Build.game_id == game_id, Build.version == version).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Build version {version} already exists for this game")
+
+    # Read file content and compute SHA256
+    content = file.file.read()
+    sha256_hash = hashlib.sha256(content).hexdigest()
+
+    # Reset file position for upload
+    file.file.seek(0)
+
+    # Upload to MinIO
+    s3_key = upload_build_fileobj(file.file, game.slug, version)
+
+    # Create build record
+    build = Build(
+        game_id=game_id,
+        version=version,
+        s3_key=s3_key,
+        sha256=sha256_hash,
+    )
+    db.add(build)
+    db.commit()
+    db.refresh(build)
+
+    return build
