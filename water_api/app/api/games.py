@@ -2,7 +2,7 @@ import hashlib
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -14,13 +14,12 @@ router = APIRouter()
 
 
 class GameOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     slug: str
     price: Decimal
-
-    class Config:
-        from_attributes = True
 
 
 class GameCreate(BaseModel):
@@ -84,14 +83,13 @@ def create_game(data: GameCreate, admin: User = Depends(require_admin), db: Sess
 
 
 class BuildOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     game_id: int
     version: str
     s3_key: str
     sha256: str
-
-    class Config:
-        from_attributes = True
 
 
 @router.post("/{game_id}/builds", response_model=BuildOut, status_code=201)

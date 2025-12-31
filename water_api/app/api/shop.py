@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -12,15 +12,14 @@ router = APIRouter()
 
 
 class GameListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     slug: str
     description: str
     price: Decimal
     owned: bool
-
-    class Config:
-        from_attributes = True
 
 
 class PurchaseOut(BaseModel):
