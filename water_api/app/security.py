@@ -49,7 +49,11 @@ def parse_jwt(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token") from e
 
 
-def current_user(creds: HTTPAuthorizationCredentials | None = Depends(security_scheme), db: Session = Depends(get_db)):
+def current_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    """Dependency that returns the current authenticated user."""
     if creds is None:
         raise HTTPException(status_code=401, detail="Missing credentials")
     data = parse_jwt(creds.credentials)
@@ -57,4 +61,11 @@ def current_user(creds: HTTPAuthorizationCredentials | None = Depends(security_s
     user = db.get(User, uid)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+def require_admin(user: User = Depends(current_user)) -> User:
+    """Dependency that requires the current user to be an admin."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
     return user

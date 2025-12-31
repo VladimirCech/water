@@ -32,6 +32,21 @@ def main():
         else:
             print("ℹ️  User already exists: test@example.com")
 
+        # Create admin user
+        admin = s.execute(select(User).where(User.email == "admin@example.com")).scalar_one_or_none()
+        if not admin:
+            admin = User(
+                username="admin",
+                email="admin@example.com",
+                password_hash=hash_password("Admin1234"),
+                role="admin",
+            )
+            s.add(admin)
+            s.flush()
+            print("✅ Created admin: admin (admin@example.com)")
+        else:
+            print("ℹ️  Admin already exists: admin@example.com")
+
         # Create demo game
         g = s.execute(select(Game).where(Game.slug == "space-ducks")).scalar_one_or_none()
         if not g:
@@ -81,8 +96,9 @@ def main():
             print("ℹ️  Entitlement already exists")
 
     print("\n🎉 Seed complete!")
-    print("   User: testuser / Test1234 (email: test@example.com)")
-    print("   Game: Space Ducks ($9.99, slug: space-ducks)")
+    print("   User:  testuser / Test1234 (email: test@example.com)")
+    print("   Admin: admin / Admin1234 (email: admin@example.com)")
+    print("   Game:  Space Ducks ($9.99, slug: space-ducks)")
     print("   Build: v1.0 available for download")
 
 
