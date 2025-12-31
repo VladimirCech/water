@@ -59,6 +59,30 @@ def get_build_download(build_id: int, user=Depends(current_user), db: Session = 
     return DownloadUrlOut(url=download_url)
 
 
+class BuildListOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    version: str
+    sha256: str
+
+
+@router.get("/{game_id}/builds", response_model=list[BuildListOut])
+def list_builds(game_id: int, user=Depends(current_user), db: Session = Depends(get_db)):
+    """List all builds for a game (requires entitlement)."""
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Check entitlement
+    entitlement = db.query(Entitlement).filter_by(user_id=user.id, game_id=game_id).first()
+    if not entitlement:
+        raise HTTPException(status_code=403, detail="No entitlement for this game")
+
+    builds = db.query(Build).filter(Build.game_id == game_id).order_by(Build.id.desc()).all()
+    return builds
+
+
 # ============ Admin Endpoints ============
 
 
