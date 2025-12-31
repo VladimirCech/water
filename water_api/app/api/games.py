@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Build, Entitlement, Game
-from app.security import current_user
+from app.models import Build, Entitlement, Game, User
+from app.security import current_user, require_admin
 from app.storage import get_download_url
 
 router = APIRouter()
@@ -20,6 +20,13 @@ class GameOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class GameCreate(BaseModel):
+    name: str
+    slug: str
+    description: str = ""
+    price: Decimal = Decimal("0.00")
 
 
 class DownloadUrlOut(BaseModel):
@@ -50,3 +57,26 @@ def get_build_download(build_id: int, user=Depends(current_user), db: Session = 
     # Generate presigned URL
     download_url = get_download_url(build.s3_key, expires_in=3600)
     return DownloadUrlOut(url=download_url)
+
+
+# ============ Admin Endpoints ============
+
+
+@router.post("/", response_model=GameOut, status_code=201)
+def create_game(data: GameCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Create a new game (admin only)."""
+    # Check if slug already exists
+    existing = db.query(Game).filter(Game.slug == data.slug).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Game with this slug already exists")
+
+    game = Game(
+        name=data.name,
+        slug=data.slug,
+        description=data.description,
+        price=data.price,
+    )
+    db.add(game)
+    db.commit()
+    db.refresh(game)
+    return game
