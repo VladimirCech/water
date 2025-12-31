@@ -11,6 +11,7 @@ from app.security import (
     REFRESH_EXPIRES_SECONDS,
     hash_password,
     make_jwt,
+    parse_jwt,
     verify_password,
 )
 
@@ -92,3 +93,29 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
     access = make_jwt(str(user.id), ACCESS_EXPIRES_SECONDS)
     refresh = make_jwt(str(user.id), REFRESH_EXPIRES_SECONDS, typ="refresh")
     return TokensOut(access_token=access, refresh_token=refresh)
+
+
+class RefreshIn(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=TokensOut)
+def refresh(data: RefreshIn, db: Session = Depends(get_db)):
+    """Refresh access token using a valid refresh token."""
+    # Parse and validate the refresh token
+    payload = parse_jwt(data.refresh_token)
+
+    # Verify it's a refresh token (not an access token)
+    if payload.get("typ") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid token type - refresh token required")
+
+    # Get user from token
+    user_id = int(payload["sub"])
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Issue new token pair
+    access = make_jwt(str(user.id), ACCESS_EXPIRES_SECONDS)
+    refresh_token = make_jwt(str(user.id), REFRESH_EXPIRES_SECONDS, typ="refresh")
+    return TokensOut(access_token=access, refresh_token=refresh_token)
