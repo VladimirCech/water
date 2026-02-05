@@ -6,25 +6,27 @@ Používá **Poetry**, **Docker Compose** a pohodlný **Makefile**.
 
 ## ✨ Features
 
-- 🔐 **JWT Authentication** - Secure login with access/refresh tokens
-- 🎮 **Game Catalog** - Browse and manage games
-- 💾 **MinIO Storage** - S3-compatible game file storage
-- 🔒 **DRM System** - Session management with heartbeat mechanism
-- 🖥️ **PySide6 Launcher** - Desktop client for game management
+- 🔐 **JWT Authentication** - Secure login with access/refresh tokens (Argon2 hashing)
+- 🎮 **Game Store** - Browse, purchase, and manage games
+- 💾 **MinIO Storage** - S3-compatible game file storage with presigned URLs
+- 🔒 **DRM System** - Launch tokens, session attestation, heartbeat mechanism
+- 🖥️ **PySide6 Launcher** - Desktop client for browsing, downloading, and launching games
+- 🎮 **Pygame Demo Game** - Example game with integrated DRM client
 - 🐳 **Docker Compose** - PostgreSQL + MinIO + API
 
 ## 🚀 Quick Start
 
 ```bash
-# Build and start services
-make build-dev
+# 1. Start backend services
 make run-api-dev
 
-# Check logs
-make logs-api-dev
+# 2. Seed demo data (creates admin user and demo game)
+make seed-dev
 
-# Stop services
-make stop-api-dev
+# 3. Run the launcher
+make run-launcher
+
+# Login: admin / Admin1234  (or testuser / Test1234)
 ```
 
 **API:** http://localhost:8080 (Swagger docs: `/docs`)  
@@ -53,12 +55,32 @@ water/
 │        ├─ games.py          # Game catalog
 │        ├─ drm.py            # Launch tokens
 │        └─ sessions.py       # Session management
-├─ water_client/              # PySide6 Launcher (TODO)
+├─ water_client/              # PySide6 Launcher
 │  ├─ pyproject.toml
 │  └─ launcher/
-└─ game_skeleton/             # Pygame Template (TODO)
+│     ├─ __main__.py          # Main launcher app (Qt GUI)
+│     ├─ config.py            # API URL configuration
+│     └─ download.py          # Download manager with progress
+└─ game_skeleton/             # Pygame Demo Game
    ├─ pyproject.toml
    └─ demo_game/
+      ├─ __main__.py          # Game with DRM integration
+      └─ drm.py               # DRM client (WaterDRM class)
+```
+
+## 🎮 Demo Game
+
+The demo game showcases full DRM integration:
+- **Launch token** validation on startup
+- **Session attestation** with the server
+- **Heartbeat** every 30 seconds to maintain session
+- **Graceful shutdown** if DRM validation fails
+
+```bash
+# The game is launched through the launcher with proper DRM tokens
+# Manual launch (for testing) requires valid tokens:
+cd ~/.water/games/demo-game/1.0.0/extracted
+python -m demo_game --token <launch_token> --access <access_token> --api http://127.0.0.1:8080
 ```
 
 ## 🛠️ Development Commands
@@ -110,10 +132,23 @@ make test             # Run tests
 | **Database** | PostgreSQL 17 |
 | **Storage** | MinIO (S3-compatible) with boto3 |
 | **Auth** | JWT (PyJWT), Argon2 password hashing |
-| **Client** | PySide6 (Qt for Python) - TODO |
-| **Game Engine** | Pygame - TODO |
+| **Client** | PySide6 6.x (Qt for Python) |
+| **Game Engine** | Pygame 2.x |
 | **Dev Tools** | Ruff (linter/formatter), mypy (type checker) |
 | **Deployment** | Docker Compose |
+
+## 🔒 DRM Flow
+
+```
+1. User clicks "Play" in launcher
+2. Launcher requests launch token: POST /launch/{build_id}
+3. API validates entitlement → returns JWT launch token (valid 10 min)
+4. Launcher starts game with --token and --access flags
+5. Game calls POST /sessions/attest with launch token
+6. API creates session, returns session_id
+7. Game sends heartbeat every 30s: POST /sessions/{id}/heartbeat
+8. If heartbeat fails or session expires → game terminates
+```
 
 ## 🔧 Configuration
 

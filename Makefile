@@ -11,7 +11,7 @@ DC_RUN := poetry run
 
 .PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev db-reset seed-dev \
         migrate-create migrate-up migrate-down migrate-history migrate-current migrate-stamp \
-        lint fmt type-check check test
+        lint fmt type-check check test run-launcher demo-no-auth demo-no-api demo-heartbeat
 
 # Docker services
 build-api-dev:
@@ -82,3 +82,10 @@ check: lint type-check
 
 test:
 	cd $(API_DIR) && poetry run pytest
+
+# Launcher
+run-launcher:
+	cd water_client && poetry run python -m launcher
+
+install-launcher:
+	cd water_client && poetry install

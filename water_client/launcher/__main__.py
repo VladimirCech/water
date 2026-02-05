@@ -29,6 +29,9 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QTabWidget,
     QProgressDialog,
+    QTextEdit,
+    QSplitter,
+    QGroupBox,
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
@@ -317,7 +320,7 @@ class MainWindow(QMainWindow):
         self.api = api
         self.download_manager = DownloadManager()
         self.setWindowTitle("Water Launcher")
-        self.setMinimumSize(600, 450)
+        self.setMinimumSize(800, 500)
 
         # Central widget
         central = QWidget()
@@ -348,10 +351,34 @@ class MainWindow(QMainWindow):
         # Library tab
         library_widget = QWidget()
         library_layout = QVBoxLayout(library_widget)
+        
+        # Splitter for list and details
+        library_splitter = QSplitter(Qt.Horizontal)
+        
+        # Left side - game list
+        library_left = QWidget()
+        library_left_layout = QVBoxLayout(library_left)
+        library_left_layout.setContentsMargins(0, 0, 0, 0)
         self.library_list = QListWidget()
         self.library_list.itemDoubleClicked.connect(self._play_game)
-        library_layout.addWidget(QLabel("Your Games:"))
-        library_layout.addWidget(self.library_list)
+        library_left_layout.addWidget(QLabel("Your Games:"))
+        library_left_layout.addWidget(self.library_list)
+        library_splitter.addWidget(library_left)
+        
+        # Right side - game details
+        library_details = QGroupBox("Game Details")
+        library_details_layout = QVBoxLayout(library_details)
+        self.library_title = QLabel("Select a game")
+        self.library_title.setFont(QFont("Arial", 16, QFont.Bold))
+        self.library_desc = QTextEdit()
+        self.library_desc.setReadOnly(True)
+        self.library_desc.setPlaceholderText("Select a game to see its description")
+        library_details_layout.addWidget(self.library_title)
+        library_details_layout.addWidget(self.library_desc)
+        library_splitter.addWidget(library_details)
+        
+        library_splitter.setSizes([250, 350])
+        library_layout.addWidget(library_splitter)
 
         btn_layout = QHBoxLayout()
         self.play_btn = QPushButton("▶ Play")
@@ -374,10 +401,37 @@ class MainWindow(QMainWindow):
         # Store tab
         store_widget = QWidget()
         store_layout = QVBoxLayout(store_widget)
+        
+        # Splitter for list and details
+        store_splitter = QSplitter(Qt.Horizontal)
+        
+        # Left side - game list
+        store_left = QWidget()
+        store_left_layout = QVBoxLayout(store_left)
+        store_left_layout.setContentsMargins(0, 0, 0, 0)
         self.store_list = QListWidget()
         self.store_list.itemSelectionChanged.connect(self._store_selection_changed)
-        store_layout.addWidget(QLabel("Available Games:"))
-        store_layout.addWidget(self.store_list)
+        store_left_layout.addWidget(QLabel("Available Games:"))
+        store_left_layout.addWidget(self.store_list)
+        store_splitter.addWidget(store_left)
+        
+        # Right side - game details
+        store_details = QGroupBox("Game Details")
+        store_details_layout = QVBoxLayout(store_details)
+        self.store_title = QLabel("Select a game")
+        self.store_title.setFont(QFont("Arial", 16, QFont.Bold))
+        self.store_price = QLabel("")
+        self.store_price.setFont(QFont("Arial", 14))
+        self.store_desc = QTextEdit()
+        self.store_desc.setReadOnly(True)
+        self.store_desc.setPlaceholderText("Select a game to see its description")
+        store_details_layout.addWidget(self.store_title)
+        store_details_layout.addWidget(self.store_price)
+        store_details_layout.addWidget(self.store_desc)
+        store_splitter.addWidget(store_details)
+        
+        store_splitter.setSizes([250, 350])
+        store_layout.addWidget(store_splitter)
 
         store_btn_layout = QHBoxLayout()
         self.buy_btn = QPushButton("🛒 Purchase")
@@ -451,16 +505,32 @@ class MainWindow(QMainWindow):
     def _library_selection_changed(self):
         items = self.library_list.selectedItems()
         has_selection = len(items) == 1
-        self.play_btn.setEnabled(has_selection)
         
-        # Enable uninstall only if game is installed
+        # Update details panel and buttons
         if has_selection:
             item = items[0]
             if isinstance(item, GameListItem):
-                self.uninstall_btn.setEnabled(item.installed)
+                game = item.game
+                self.library_title.setText(game["name"])
+                self.library_desc.setText(game.get("description", "No description available."))
+                
+                # Change button text based on installed status
+                if item.installed:
+                    self.play_btn.setText("▶ Play")
+                    self.play_btn.setEnabled(True)
+                    self.uninstall_btn.setEnabled(True)
+                else:
+                    self.play_btn.setText("⬇ Install")
+                    self.play_btn.setEnabled(True)
+                    self.uninstall_btn.setEnabled(False)
             else:
+                self.play_btn.setEnabled(False)
                 self.uninstall_btn.setEnabled(False)
         else:
+            self.library_title.setText("Select a game")
+            self.library_desc.clear()
+            self.play_btn.setText("▶ Play")
+            self.play_btn.setEnabled(False)
             self.uninstall_btn.setEnabled(False)
 
     def _store_selection_changed(self):
@@ -468,14 +538,30 @@ class MainWindow(QMainWindow):
         if items:
             item = items[0]
             if isinstance(item, GameListItem):
+                game = item.game
+                # Update details panel
+                self.store_title.setText(game["name"])
+                price = game.get("price", "0.00")
+                owned = game.get("owned", False)
+                if owned:
+                    self.store_price.setText("✓ Owned")
+                    self.store_price.setStyleSheet("color: green; font-weight: bold;")
+                else:
+                    self.store_price.setText(f"${price}")
+                    self.store_price.setStyleSheet("color: #4285f4; font-weight: bold;")
+                self.store_desc.setText(game.get("description", "No description available."))
                 # Enable buy only if not owned
-                self.buy_btn.setEnabled(not item.game.get("owned", False))
+                self.buy_btn.setEnabled(not owned)
             else:
                 self.buy_btn.setEnabled(False)
         else:
+            self.store_title.setText("Select a game")
+            self.store_price.setText("")
+            self.store_desc.clear()
             self.buy_btn.setEnabled(False)
 
     def _play_game(self):
+        """Play or install the selected game based on its state."""
         items = self.library_list.selectedItems()
         if not items:
             return
@@ -497,38 +583,39 @@ class MainWindow(QMainWindow):
 
             # Get latest build
             latest_build = max(builds, key=lambda b: b["id"])
-            build_id = latest_build["id"]
             version = latest_build["version"]
-            expected_sha256 = latest_build.get("sha256")
 
             # Check if already installed
             if self.download_manager.is_installed(game_slug, version):
+                # Game is installed - launch it
                 self._launch_game(game, latest_build)
-                return
-
-            # Need to download first
-            reply = QMessageBox.question(
-                self,
-                "Download Required",
-                f"'{game['name']}' v{version} needs to be downloaded.\n\nDownload now?",
-                QMessageBox.Yes | QMessageBox.No,
-            )
-
-            if reply != QMessageBox.Yes:
-                return
-
-            # Get download URL
-            download_url = self.api.get_download_url(build_id)
-
-            # Start download with progress dialog
-            self._start_download(game, latest_build, download_url, expected_sha256)
+            else:
+                # Game not installed - download it
+                self._install_game(game, latest_build)
 
         except httpx.HTTPStatusError as e:
             QMessageBox.critical(self, "Error", f"API Error: {e.response.text}")
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
-    def _start_download(self, game: dict, build: dict, url: str, expected_sha256: Optional[str]):
+    def _install_game(self, game: dict, build: dict):
+        """Download and install a game (without launching)."""
+        build_id = build["id"]
+        expected_sha256 = build.get("sha256")
+        
+        try:
+            # Get download URL
+            download_url = self.api.get_download_url(build_id)
+
+            # Start download with progress dialog (don't launch after)
+            self._start_download(game, build, download_url, expected_sha256, launch_after=False)
+
+        except httpx.HTTPStatusError as e:
+            QMessageBox.critical(self, "Error", f"API Error: {e.response.text}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
+    def _start_download(self, game: dict, build: dict, url: str, expected_sha256: Optional[str], launch_after: bool = True):
         """Start downloading a game with progress dialog."""
         game_slug = game["slug"]
         version = build["version"]
@@ -558,6 +645,7 @@ class MainWindow(QMainWindow):
         # Store game info for launch after download
         self._pending_game = game
         self._pending_build = build
+        self._launch_after_download = launch_after
 
         # Connect signals
         self.download_thread.progress.connect(self._on_download_progress)
@@ -584,12 +672,22 @@ class MainWindow(QMainWindow):
         """Handle successful download."""
         self.progress_dialog.close()
         self.statusBar().showMessage(f"Downloaded to {game_path}")
+        
+        # Refresh library to show installed status
+        self._load_library()
 
-        # Launch the game
-        if hasattr(self, "_pending_game") and hasattr(self, "_pending_build"):
-            self._launch_game(self._pending_game, self._pending_build)
+        # Launch the game only if requested
+        if getattr(self, "_launch_after_download", False):
+            if hasattr(self, "_pending_game") and hasattr(self, "_pending_build"):
+                self._launch_game(self._pending_game, self._pending_build)
+        
+        # Cleanup
+        if hasattr(self, "_pending_game"):
             del self._pending_game
+        if hasattr(self, "_pending_build"):
             del self._pending_build
+        if hasattr(self, "_launch_after_download"):
+            del self._launch_after_download
 
     def _on_download_error(self, error_msg: str):
         """Handle download error."""

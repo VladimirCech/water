@@ -19,6 +19,7 @@ class GameOut(BaseModel):
     id: int
     name: str
     slug: str
+    description: str = ""
     price: Decimal
 
 
