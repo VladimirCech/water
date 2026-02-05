@@ -11,7 +11,56 @@ DC_RUN := poetry run
 
 .PHONY: build-dev run-api-dev stop-api-dev restart-api-dev logs-api-dev db-reset seed-dev \
         migrate-create migrate-up migrate-down migrate-history migrate-current migrate-stamp \
-        lint fmt type-check check test run-launcher demo-no-auth demo-no-api demo-heartbeat
+        lint fmt type-check check test run-launcher install-launcher setup demo
+
+# =============================================================================
+# 🚀 QUICK START (for new users)
+# =============================================================================
+
+setup:
+	@echo "🚀 Water Game Store - Cold Start Setup"
+	@echo "======================================="
+	@echo ""
+	@echo "Step 1/5: Building Docker images..."
+	$(DC) build api
+	@echo ""
+	@echo "Step 2/5: Starting services (PostgreSQL, MinIO, API)..."
+	$(DC) up -d db minio
+	@echo "   Waiting for database to be ready..."
+	@sleep 5
+	$(DC) up -d api
+	@echo "   Waiting for API to start..."
+	@sleep 3
+	@echo ""
+	@echo "Step 3/5: Running database migrations..."
+	$(DC_EXEC) $(DC_RUN) alembic upgrade head
+	@echo ""
+	@echo "Step 4/5: Seeding demo data..."
+	$(DC_EXEC) $(DC_RUN) python -m app.seed
+	@echo ""
+	@echo "Step 5/5: Installing launcher dependencies..."
+	cd water_client && poetry install
+	@echo ""
+	@echo "======================================="
+	@echo "✅ Setup complete!"
+	@echo ""
+	@echo "📋 What's next:"
+	@echo "   make run-launcher    # Start the launcher"
+	@echo ""
+	@echo "🔑 Login credentials:"
+	@echo "   admin / Admin1234"
+	@echo "   testuser / Test1234"
+	@echo ""
+	@echo "🌐 URLs:"
+	@echo "   API:   http://localhost:8080/docs"
+	@echo "   MinIO: http://localhost:9001 (minioadmin/minioadmin)"
+	@echo "======================================="
+
+demo: setup run-launcher
+
+# =============================================================================
+# 🐳 Docker Services
+# =============================================================================
 
 # Docker services
 build-api-dev:
