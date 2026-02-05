@@ -32,10 +32,10 @@ class PurchaseOut(BaseModel):
 def list_store_games(user: User = Depends(current_user), db: Session = Depends(get_db)):
     """List all games in the store with ownership status."""
     games = db.query(Game).all()
-    
+
     # Get user's owned game IDs
     owned_ids = {e.game_id for e in db.query(Entitlement).filter_by(user_id=user.id).all()}
-    
+
     return [
         GameListItem(
             id=g.id,
@@ -53,7 +53,7 @@ def list_store_games(user: User = Depends(current_user), db: Session = Depends(g
 def purchase_game(game_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """
     Purchase a game and create an entitlement.
-    
+
     In a real system, this would integrate with a payment provider.
     For now, it just creates the entitlement directly.
     """
