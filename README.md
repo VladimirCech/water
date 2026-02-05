@@ -53,6 +53,7 @@ water/
 │     └─ api/                 # API routes
 │        ├─ auth.py           # Login/register
 │        ├─ games.py          # Game catalog
+│        ├─ shop.py           # Store & purchases
 │        ├─ drm.py            # Launch tokens
 │        └─ sessions.py       # Session management
 ├─ water_client/              # PySide6 Launcher
@@ -88,11 +89,18 @@ python -m demo_game --token <launch_token> --access <access_token> --api http://
 ### Docker Services
 
 ```bash
-make build-dev        # Build API Docker image
+make build-api-dev    # Build API Docker image
 make run-api-dev      # Start all services (PostgreSQL + MinIO + API)
 make restart-api-dev  # Restart API container
 make logs-api-dev     # View logs
 make stop-api-dev     # Stop all services
+```
+
+### Launcher
+
+```bash
+make install-launcher # Install launcher dependencies
+make run-launcher     # Run the launcher
 ```
 
 ### Code Quality
@@ -161,13 +169,6 @@ MINIO_ENDPOINT=minio:9000
 MINIO_BUCKET=water-games
 ```
 
-## 📝 Notes
-
-- Demo user seed script TODO
-- Game upload endpoint in progress
-- SHA-256 verification for downloads planned
-- PySide6 launcher implementation pending
-- Pygame game skeleton with DRM integration coming soon
 
 ## 🎓 Project Context
 
