@@ -33,9 +33,9 @@ def main():
             )
             s.add(u)
             s.flush()
-            print("✅ Created user: testuser (test@example.com)")
+            print("[+] Created user: testuser (test@example.com)")
         else:
-            print("ℹ️  User already exists: test@example.com")
+            print("[i] User already exists: test@example.com")
 
         # Create admin user
         admin = s.execute(select(User).where(User.email == "admin@example.com")).scalar_one_or_none()
@@ -48,9 +48,9 @@ def main():
             )
             s.add(admin)
             s.flush()
-            print("✅ Created admin: admin (admin@example.com)")
+            print("[+] Created admin: admin (admin@example.com)")
         else:
-            print("ℹ️  Admin already exists: admin@example.com")
+            print("[i] Admin already exists: admin@example.com")
 
         # Create Demo Game (uses game_skeleton)
         demo_game = s.execute(select(Game).where(Game.slug == "demo-game")).scalar_one_or_none()
@@ -65,9 +65,9 @@ def main():
             )
             s.add(demo_game)
             s.flush()
-            print("✅ Created game: Demo Game")
+            print("[+] Created game: Demo Game")
         else:
-            print("ℹ️  Game already exists: Demo Game")
+            print("[i] Game already exists: Demo Game")
 
         # Create ZIP from game_skeleton and upload to MinIO
         demo_build = s.execute(
@@ -95,14 +95,14 @@ def main():
                     )
                     s.add(demo_build)
                     s.flush()
-                    print(f"✅ Created Demo Game build v1.0.0 from game_skeleton")
-                    print(f"   Uploaded to MinIO: {s3_key}")
-                    print(f"   SHA256: {digest[:16]}...")
+                    print(f"[+] Created Demo Game build v1.0.0 from game_skeleton")
+                    print(f"    Uploaded to MinIO: {s3_key}")
+                    print(f"    SHA256: {digest[:16]}...")
             else:
-                print("⚠️  game_skeleton not found at /app/game_skeleton")
-                print("   Make sure the volume is mounted in docker-compose.yml")
+                print("[!] game_skeleton not found at /app/game_skeleton")
+                print("    Make sure the volume is mounted in docker-compose.yml")
         else:
-            print("ℹ️  Demo Game build already exists: v1.0.0")
+            print("[i] Demo Game build already exists: v1.0.0")
 
         # Create Space Ducks (paid game example)
         space_ducks = s.execute(select(Game).where(Game.slug == "space-ducks")).scalar_one_or_none()
@@ -116,9 +116,9 @@ def main():
             )
             s.add(space_ducks)
             s.flush()
-            print("✅ Created game: Space Ducks ($9.99)")
+            print("[+] Created game: Space Ducks ($9.99)")
         else:
-            print("ℹ️  Game already exists: Space Ducks")
+            print("[i] Game already exists: Space Ducks")
 
         # Create entitlements
         # Admin owns Demo Game
@@ -127,9 +127,9 @@ def main():
         ).scalar_one_or_none()
         if not admin_demo:
             s.add(Entitlement(user_id=admin.id, game_id=demo_game.id))
-            print("✅ Created entitlement: admin owns Demo Game")
+            print("[+] Created entitlement: admin owns Demo Game")
         else:
-            print("ℹ️  Entitlement already exists: admin → Demo Game")
+            print("[i] Entitlement already exists: admin -> Demo Game")
 
         # Testuser owns Demo Game too
         user_demo = s.execute(
@@ -137,20 +137,20 @@ def main():
         ).scalar_one_or_none()
         if not user_demo:
             s.add(Entitlement(user_id=u.id, game_id=demo_game.id))
-            print("✅ Created entitlement: testuser owns Demo Game")
+            print("[+] Created entitlement: testuser owns Demo Game")
         else:
-            print("ℹ️  Entitlement already exists: testuser → Demo Game")
+            print("[i] Entitlement already exists: testuser -> Demo Game")
 
-    print("\n🎉 Seed complete!")
-    print("   Users:")
-    print("     - testuser / Test1234 (email: test@example.com)")
-    print("     - admin / Admin1234 (email: admin@example.com)")
-    print("   Games:")
-    print("     - Demo Game (Free, slug: demo-game) ← with actual game!")
-    print("     - Space Ducks ($9.99, slug: space-ducks)")
-    print("   Entitlements:")
-    print("     - admin owns Demo Game")
-    print("     - testuser owns Demo Game")
+    print("\nSeed complete!")
+    print("  Users:")
+    print("    - testuser / Test1234 (email: test@example.com)")
+    print("    - admin / Admin1234 (email: admin@example.com)")
+    print("  Games:")
+    print("    - Demo Game (slug: demo-game) <- with actual game!")
+    print("    - Space Ducks ($9.99, slug: space-ducks)")
+    print("  Entitlements:")
+    print("    - admin owns Demo Game")
+    print("    - testuser owns Demo Game")
 
 
 if __name__ == "__main__":

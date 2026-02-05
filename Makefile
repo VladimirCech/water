@@ -14,12 +14,12 @@ DC_RUN := poetry run
         lint fmt type-check check test run-launcher install-launcher setup demo
 
 # =============================================================================
-# 🚀 QUICK START (for new users)
+# QUICK START (for new users)
 # =============================================================================
 
 setup:
-	@echo "🚀 Water Game Store - Cold Start Setup"
-	@echo "======================================="
+	@echo "Water Game Store - Cold Start Setup"
+	@echo "===================================="
 	@echo ""
 	@echo "Step 1/5: Building Docker images..."
 	$(DC) build api
@@ -41,25 +41,25 @@ setup:
 	@echo "Step 5/5: Installing launcher dependencies..."
 	cd water_client && poetry install
 	@echo ""
-	@echo "======================================="
-	@echo "✅ Setup complete!"
+	@echo "===================================="
+	@echo "Setup complete!"
 	@echo ""
-	@echo "📋 What's next:"
+	@echo "What's next:"
 	@echo "   make run-launcher    # Start the launcher"
 	@echo ""
-	@echo "🔑 Login credentials:"
+	@echo "Login credentials:"
 	@echo "   admin / Admin1234"
 	@echo "   testuser / Test1234"
 	@echo ""
-	@echo "🌐 URLs:"
+	@echo "URLs:"
 	@echo "   API:   http://localhost:8080/docs"
 	@echo "   MinIO: http://localhost:9001 (minioadmin/minioadmin)"
-	@echo "======================================="
+	@echo "===================================="
 
 demo: setup run-launcher
 
 # =============================================================================
-# 🐳 Docker Services
+# Docker Services
 # =============================================================================
 
 # Docker services
@@ -79,7 +79,7 @@ logs-api-dev:
 	$(DC) logs -f api
 
 db-reset:
-	@echo "⚠️  This will DELETE all data in the database!"
+	@echo "WARNING: This will DELETE all data in the database!"
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
@@ -89,7 +89,7 @@ db-reset:
 		($(DC) up api -d) && \
 		sleep 2 && \
 		($(DC_EXEC) $(DC_RUN) alembic upgrade head) && \
-		echo "✅ Database reset complete. Run 'make seed-dev' to add demo data."; \
+		echo "Database reset complete. Run 'make seed-dev' to add demo data."; \
 	fi
 
 # Database operations
@@ -127,7 +127,7 @@ type-check:
 	cd $(API_DIR) && poetry run mypy app/
 
 check: lint type-check
-	@echo "✅ All checks passed!"
+	@echo "All checks passed!"
 
 test:
 	cd $(API_DIR) && poetry run pytest

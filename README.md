@@ -16,18 +16,20 @@ Používá **Poetry**, **Docker Compose** a pohodlný **Makefile**.
 
 ## 🚀 Quick Start
 
+**TL;DR:**
 ```bash
-# 1. Start backend services
-make run-api-dev
-
-# 2. Seed demo data (creates admin user and demo game)
-make seed-dev
-
-# 3. Run the launcher
-make run-launcher
-
-# Login: admin / Admin1234  (or testuser / Test1234)
+make setup        # First time setup (builds, starts, seeds)
+make run-launcher # Start the launcher
 ```
+
+**Manual steps (if needed):**
+```bash
+make run-api-dev  # Start backend services
+make seed-dev     # Seed demo data
+make run-launcher # Run the launcher
+```
+
+**Login:** `admin / Admin1234` or `testuser / Test1234`
 
 **API:** http://localhost:8080 (Swagger docs: `/docs`)  
 **MinIO Console:** http://localhost:9001 (minioadmin / minioadmin)
